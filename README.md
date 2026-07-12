@@ -39,46 +39,6 @@ make app
 # 输出：.build/小雷壁纸.app
 ```
 
-## 独立分发（签名 + 公证 + DMG）
-
-### 前提条件
-
-1. **Apple Developer Program**（$99/年）— [developer.apple.com](https://developer.apple.com)
-2. **Developer ID Application 证书** — Xcode → Settings → Accounts → Manage Certificates
-3. **App 专用密码** — [appleid.apple.com](https://appleid.apple.com) → 登录与安全 → App 专用密码
-4. **Team ID** — [developer.apple.com/account](https://developer.apple.com/account) 会员页面查看
-
-### 一键发布
-
-```bash
-make release \
-    DEV_ID='Developer ID Application: Your Name (XXXXXXXXXX)' \
-    APPLE_ID='you@example.com' \
-    TEAM_ID='XXXXXXXXXX' \
-    APP_PASSWORD='xxxx-xxxx-xxxx-xxxx'
-```
-
-流程：构建 → 签名 → 公证 → 装订票据 → DMG
-
-### 分步执行
-
-```bash
-make build                              # 编译
-make sign DEV_ID='Developer ID...'      # 签名
-make notarize APPLE_ID=... TEAM_ID=... APP_PASSWORD=...  # 公证
-make staple                             # 装订票据
-make dmg                                # 创建 DMG
-```
-
-输出：`.build/小雷壁纸-1.0.0.dmg`，上传到 GitHub Releases 分发。
-
-## 发布前检查
-
-- [ ] 替换 `XiaoLeiWallpaper.icns` 为自己设计的图标
-- [ ] Apple Silicon 和 Intel Mac 上均已测试
-- [ ] 验证公证：`spctl -a -v .build/小雷壁纸.app`
-- [ ] 在 GitHub Releases 中上传 DMG
-
 ## 技术实现
 
 - **SwiftUI + AppKit**：界面用 SwiftUI，壁纸引擎用 AppKit（`NSWindow` + `AVPlayerLayer`）
