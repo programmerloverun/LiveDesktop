@@ -121,27 +121,40 @@ final class WallpaperEngine: NSObject, ObservableObject {
     /// When the screen locks, the video window is hidden and the system shows the
     /// lock screen — which uses this static image, creating a seamless transition.
     private func updateLockScreenImage(for url: URL) {
-        DispatchQueue.global(qos: .background).async { [weak self] in
-            let asset = AVAsset(url: url)
+        let imageDir = lockScreenImageDir
+        let imageURL = lockScreenImageURL
+        DispatchQueue.global(qos: .background).async {
+            let asset = AVURLAsset(url: url)
             let gen = AVAssetImageGenerator(asset: asset)
             gen.appliesPreferredTrackTransform = true
-            gen.maximumSize = CGSize(width: 3840, height: 2160) // 4K max
+            gen.maximumSize = CGSize(width: 3840, height: 2160)
 
             let time = CMTime(seconds: 1, preferredTimescale: 600)
-            guard let cg = try? gen.copyCGImage(at: time, actualTime: nil) else { return }
+            guard let cg = try? gen.copyCGImage(at: time, actualTime: nil) else {
+                print("[LiveDesktop] Failed to capture frame for lock screen")
+                return
+            }
 
             let png = NSBitmapImageRep(cgImage: cg)
             png.size = NSSize(width: cg.width, height: cg.height)
             guard let data = png.representation(using: .png, properties: [:]) else { return }
 
-            let dir = self?.lockScreenImageDir
-            try? FileManager.default.createDirectory(at: dir!, withIntermediateDirectories: true)
-            try? data.write(to: self?.lockScreenImageURL ?? URL(fileURLWithPath: "/dev/null"))
+            try? FileManager.default.createDirectory(at: imageDir, withIntermediateDirectories: true)
+            do {
+                try data.write(to: imageURL)
+                print("[LiveDesktop] Lock screen image saved: \(imageURL.path)")
+            } catch {
+                print("[LiveDesktop] Failed to write lock screen image: \(error)")
+                return
+            }
 
-            // Set as desktop wallpaper for all screens — lock screen uses this by default
-            let imageURL = self?.lockScreenImageURL ?? URL(fileURLWithPath: "/dev/null")
             for screen in NSScreen.screens {
-                try? NSWorkspace.shared.setDesktopImageURL(imageURL, for: screen, options: [:])
+                do {
+                    try NSWorkspace.shared.setDesktopImageURL(imageURL, for: screen, options: [:])
+                    print("[LiveDesktop] Set desktop image for screen: \(screen)")
+                } catch {
+                    print("[LiveDesktop] Failed to set desktop image: \(error)")
+                }
             }
         }
     }
