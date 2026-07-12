@@ -11,7 +11,17 @@ final class WallpaperEngine: NSObject, ObservableObject {
     private var player: AVPlayer?
     private var loopObserver: NSObjectProtocol?
     private var safetyTimer: Timer?
+    private var currentVideoURL: URL?
     private var isLocked = false
+
+    private var lockScreenImageDir: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return base.appendingPathComponent("LiveDesktop")
+    }
+
+    private var lockScreenImageURL: URL {
+        lockScreenImageDir.appendingPathComponent("lockscreen.png")
+    }
 
     private func desktopLevel() -> NSWindow.Level {
         NSWindow.Level(Int(CGWindowLevelForKey(.desktopIconWindow)) - 1)
@@ -57,6 +67,8 @@ final class WallpaperEngine: NSObject, ObservableObject {
         setupAllScreens()
         player.play()
         startObservers()
+        currentVideoURL = url
+        updateLockScreenImage(for: url)
     }
 
     private func swap(to url: URL) {
@@ -78,8 +90,6 @@ final class WallpaperEngine: NSObject, ObservableObject {
         let startTime = CMTime(seconds: 0.1, preferredTimescale: 600)
         player.seek(to: startTime, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
             guard let self else { return }
-            // Force all layers to display the new frame, preventing
-            // the second display from showing a mix of old + new frames
             for (_, entry) in self.entries {
                 CATransaction.begin()
                 CATransaction.setDisableActions(true)
@@ -95,6 +105,44 @@ final class WallpaperEngine: NSObject, ObservableObject {
         ) { [weak player] _ in
             player?.seek(to: CMTime.zero)
             player?.play()
+        }
+
+        currentVideoURL = url
+        // Delay to let the new item load before capturing
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.updateLockScreenImage(for: url)
+        }
+    }
+
+    // MARK: - Lock Screen Image
+
+    /// Capture a frame from the video and set it as the system desktop wallpaper.
+    /// Our video window sits on top of the desktop, so the user sees the video.
+    /// When the screen locks, the video window is hidden and the system shows the
+    /// lock screen — which uses this static image, creating a seamless transition.
+    private func updateLockScreenImage(for url: URL) {
+        DispatchQueue.global(qos: .background).async { [weak self] in
+            let asset = AVAsset(url: url)
+            let gen = AVAssetImageGenerator(asset: asset)
+            gen.appliesPreferredTrackTransform = true
+            gen.maximumSize = CGSize(width: 3840, height: 2160) // 4K max
+
+            let time = CMTime(seconds: 1, preferredTimescale: 600)
+            guard let cg = try? gen.copyCGImage(at: time, actualTime: nil) else { return }
+
+            let png = NSBitmapImageRep(cgImage: cg)
+            png.size = NSSize(width: cg.width, height: cg.height)
+            guard let data = png.representation(using: .png, properties: [:]) else { return }
+
+            let dir = self?.lockScreenImageDir
+            try? FileManager.default.createDirectory(at: dir!, withIntermediateDirectories: true)
+            try? data.write(to: self?.lockScreenImageURL ?? URL(fileURLWithPath: "/dev/null"))
+
+            // Set as desktop wallpaper for all screens — lock screen uses this by default
+            let imageURL = self?.lockScreenImageURL ?? URL(fileURLWithPath: "/dev/null")
+            for screen in NSScreen.screens {
+                try? NSWorkspace.shared.setDesktopImageURL(imageURL, for: screen, options: [:])
+            }
         }
     }
 
