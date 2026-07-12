@@ -162,8 +162,8 @@ final class WallpaperEngine: NSObject, ObservableObject {
         }
     }
 
-    /// Write into macOS wallpaper store so the lock screen shows our image too.
-    /// On macOS 13+, desktop and lock-screen wallpapers are stored independently.
+    /// Remove per-display Idle entries from the wallpaper store, forcing macOS into
+    /// "linked" mode where the lock screen follows the desktop wallpaper set via NSWorkspace.
     private func syncLockScreenToDesktop(imagePath: String) {
         let storeURL = URL(fileURLWithPath: NSHomeDirectory())
             .appendingPathComponent("Library/Application Support/com.apple.wallpaper/Store/Index.plist")
@@ -178,55 +178,34 @@ final class WallpaperEngine: NSObject, ObservableObject {
             "url": ["relative": imageURLEncoded]
         ]
         let imageConfigData = try? PropertyListSerialization.data(fromPropertyList: imageConfig, format: .binary, options: 0)
-
         var didChange = false
 
-        // Update per-display Idle entries
+        // Remove per-display Idle so the global entry takes effect
         if var displays = plist["Displays"] as? [String: [String: Any]] {
-            for (uuid, var modes) in displays {
-                guard let desktop = modes["Desktop"] as? [String: Any],
-                      let content = desktop["Content"] as? [String: Any],
-                      let encodedOptions = content["EncodedOptionValues"] as? Data,
-                      let imageConfigData else { continue }
-
-                let idleContent: [String: Any] = [
-                    "Choices": [[
-                        "Configuration": imageConfigData,
-                        "Files": [],
-                        "Provider": "com.apple.wallpaper.choice.image"
-                    ]],
-                    "EncodedOptionValues": encodedOptions,
-                    "Shuffle": NSNull()
-                ]
-                modes["Idle"] = [
-                    "Content": idleContent,
-                    "LastSet": Date(),
-                    "LastUse": Date()
-                ]
+            for (uuid, var modes) in displays where modes["Idle"] != nil {
+                modes.removeValue(forKey: "Idle")
                 displays[uuid] = modes
                 didChange = true
             }
             plist["Displays"] = displays
         }
 
-        // Update global Idle entry
+        // Update global Idle to use our image
         if var global = plist["AllSpacesAndDisplays"] as? [String: Any],
-           let desktopGlobal = global["Idle"] as? [String: Any],
-           let content = desktopGlobal["Content"] as? [String: Any],
+           let globalIdle = global["Idle"] as? [String: Any],
+           let content = globalIdle["Content"] as? [String: Any],
            let encodedOptions = content["EncodedOptionValues"] as? Data,
            let imageConfigData {
 
-            let idleContent: [String: Any] = [
-                "Choices": [[
-                    "Configuration": imageConfigData,
-                    "Files": [],
-                    "Provider": "com.apple.wallpaper.choice.image"
-                ]],
-                "EncodedOptionValues": encodedOptions,
-                "Shuffle": NSNull()
-            ]
             global["Idle"] = [
-                "Content": idleContent,
+                "Content": [
+                    "Choices": [[
+                        "Configuration": imageConfigData,
+                        "Files": [],
+                        "Provider": "com.apple.wallpaper.choice.image"
+                    ]],
+                    "EncodedOptionValues": encodedOptions
+                ],
                 "LastSet": Date(),
                 "LastUse": Date()
             ]
@@ -234,20 +213,17 @@ final class WallpaperEngine: NSObject, ObservableObject {
             didChange = true
         }
 
-        guard didChange else { return }
+        guard didChange, let newData = try? PropertyListSerialization.data(fromPropertyList: plist, format: .binary, options: 0)
+        else { return }
 
-        do {
-            let newData = try PropertyListSerialization.data(fromPropertyList: plist, format: .binary, options: 0)
-            try newData.write(to: storeURL, options: .atomic)
-            // Notify the system to reload wallpaper
-            let task = Process()
-            task.launchPath = "/usr/bin/killall"
-            task.arguments = ["-HUP", "WallpaperAgent"]
-            task.launch()
-            print("[LiveDesktop] Lock screen wallpaper synced")
-        } catch {
-            print("[LiveDesktop] Failed to sync lock screen: \(error)")
-        }
+        try? newData.write(to: storeURL, options: .atomic)
+
+        // Restart WallpaperAgent so it picks up the new config
+        let task = Process()
+        task.launchPath = "/usr/bin/killall"
+        task.arguments = ["WallpaperAgent"]
+        task.launch()
+        print("[LiveDesktop] Lock screen synced to desktop image")
     }
 
     // MARK: - Stop
