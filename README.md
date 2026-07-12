@@ -6,6 +6,12 @@
 
 ![主界面](docs/screenshot.png)
 
+### 演示视频
+
+<video src="https://github.com/programmerloverun/XiaoLeiWallpaper/raw/main/docs/demo.mp4" controls width="100%"></video>
+
+[下载演示视频](docs/demo.mp4)
+
 - **视频桌面壁纸**：将任意 MP4 视频设为桌面壁纸，静音循环播放
 - **多显示器支持**：所有外接屏幕同步显示，插拔显示器自动适配
 - **壁纸库**：上传管理多个视频壁纸，一键切换
