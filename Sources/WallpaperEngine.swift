@@ -11,9 +11,16 @@ final class WallpaperEngine: NSObject, ObservableObject {
     private var player: AVPlayer?
     private var loopObserver: NSObjectProtocol?
     private var safetyTimer: Timer?
+    private var isLocked = false
 
     private func desktopLevel() -> NSWindow.Level {
         NSWindow.Level(Int(CGWindowLevelForKey(.desktopIconWindow)) - 1)
+    }
+
+    /// Just below the lock screen password dialog — above the default lock wallpaper.
+    /// kCGMaximumWindowLevel = Int32.max (2147483647); lock screen bg is a few levels below.
+    private func lockScreenLevel() -> NSWindow.Level {
+        NSWindow.Level(Int(Int32.max) - 17)
     }
 
     // MARK: - Start
@@ -126,6 +133,14 @@ final class WallpaperEngine: NSObject, ObservableObject {
             self, selector: #selector(handleDisplayChange),
             name: NSApplication.didChangeScreenParametersNotification, object: nil
         )
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(handleLock),
+            name: NSWorkspace.sessionDidResignActiveNotification, object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(handleUnlock),
+            name: NSWorkspace.sessionDidBecomeActiveNotification, object: nil
+        )
 
         // Safety timer: 5 seconds (was 2s — less CPU overhead)
         safetyTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
@@ -150,6 +165,22 @@ final class WallpaperEngine: NSObject, ObservableObject {
     @objc private func handleSleep() {
         // Pause during display sleep to save energy
         player?.pause()
+    }
+
+    @objc private func handleLock() {
+        isLocked = true
+        let level = lockScreenLevel()
+        for (_, e) in entries {
+            if e.window.isVisible { e.window.level = level }
+        }
+    }
+
+    @objc private func handleUnlock() {
+        isLocked = false
+        let level = desktopLevel()
+        for (_, e) in entries {
+            if e.window.isVisible { e.window.level = level }
+        }
     }
 
     @objc private func handleDisplayChange() {
@@ -190,7 +221,7 @@ final class WallpaperEngine: NSObject, ObservableObject {
                     defer: false,
                     screen: screen
                 )
-                window.level = desktopLevel()
+                window.level = isLocked ? lockScreenLevel() : desktopLevel()
                 window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
                 window.isOpaque = true
                 window.hasShadow = false
@@ -222,7 +253,7 @@ final class WallpaperEngine: NSObject, ObservableObject {
             player.play()
         }
 
-        let targetLevel = desktopLevel()
+        let targetLevel = isLocked ? lockScreenLevel() : desktopLevel()
         for (_, e) in entries {
             // Minimize work: skip if everything is fine
             if e.window.isVisible,
