@@ -133,13 +133,15 @@ final class WallpaperEngine: NSObject, ObservableObject {
             self, selector: #selector(handleDisplayChange),
             name: NSApplication.didChangeScreenParametersNotification, object: nil
         )
-        NotificationCenter.default.addObserver(
+        DistributedNotificationCenter.default().addObserver(
             self, selector: #selector(handleLock),
-            name: NSWorkspace.sessionDidResignActiveNotification, object: nil
+            name: NSNotification.Name("com.apple.screenIsLocked"),
+            object: nil
         )
-        NotificationCenter.default.addObserver(
+        DistributedNotificationCenter.default().addObserver(
             self, selector: #selector(handleUnlock),
-            name: NSWorkspace.sessionDidBecomeActiveNotification, object: nil
+            name: NSNotification.Name("com.apple.screenIsUnlocked"),
+            object: nil
         )
 
         // Safety timer: 5 seconds (was 2s — less CPU overhead)
@@ -151,6 +153,7 @@ final class WallpaperEngine: NSObject, ObservableObject {
     private func stopObservers() {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         NotificationCenter.default.removeObserver(self)
+        DistributedNotificationCenter.default().removeObserver(self)
         safetyTimer?.invalidate()
         safetyTimer = nil
     }
@@ -163,23 +166,28 @@ final class WallpaperEngine: NSObject, ObservableObject {
     }
 
     @objc private func handleSleep() {
-        // Pause during display sleep to save energy
-        player?.pause()
+        // Only pause if screens slept from idle timeout, not from lock
+        if !isLocked {
+            player?.pause()
+        }
     }
 
     @objc private func handleLock() {
         isLocked = true
         let level = lockScreenLevel()
         for (_, e) in entries {
-            if e.window.isVisible { e.window.level = level }
+            e.window.level = level
+            e.window.orderFront(nil)
         }
+        // Keep video playing on lock screen
+        player?.play()
     }
 
     @objc private func handleUnlock() {
         isLocked = false
         let level = desktopLevel()
         for (_, e) in entries {
-            if e.window.isVisible { e.window.level = level }
+            e.window.level = level
         }
     }
 
