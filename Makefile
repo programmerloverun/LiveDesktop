@@ -1,9 +1,9 @@
-APP_NAME       := XiaoLeiWallpaper
-BUNDLE_NAME    := 小雷壁纸.app
-BUNDLE_ID      := com.xiaolei.wallpaper
+APP_NAME       := LiveDesktop
+BUNDLE_NAME    := LiveDesktop.app
+BUNDLE_ID      := com.livedesktop.app
 VERSION        := 1.0.0
 BUILD_DIR      := .build
-DMG_NAME       := 小雷壁纸-$(VERSION).dmg
+DMG_NAME       := LiveDesktop-$(VERSION).dmg
 
 # Signing (fill these in before running `make release`)
 DEV_ID         ?= # e.g. "Developer ID Application: Your Name (TEAMID)"

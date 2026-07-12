@@ -2,8 +2,8 @@
 set -e
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
-APP_NAME="XiaoLeiWallpaper"
-BUNDLE_NAME="小雷壁纸.app"
+APP_NAME="LiveDesktop"
+BUNDLE_NAME="LiveDesktop.app"
 BUILD_DIR="$PROJECT_DIR/.build"
 APP_DIR="$BUILD_DIR/$BUNDLE_NAME"
 CONTENTS="$APP_DIR/Contents"
@@ -33,8 +33,8 @@ mkdir -p "$RESOURCES_DIR"
 
 # Copy binary, icon, and resources
 cp "$BINARY" "$MACOS_DIR/$APP_NAME"
-if [ -f "$PROJECT_DIR/XiaoLeiWallpaper.icns" ]; then
-    cp "$PROJECT_DIR/XiaoLeiWallpaper.icns" "$RESOURCES_DIR/AppIcon.icns"
+if [ -f "$PROJECT_DIR/LiveDesktop.icns" ]; then
+    cp "$PROJECT_DIR/LiveDesktop.icns" "$RESOURCES_DIR/AppIcon.icns"
 fi
 if [ -f "$PROJECT_DIR/Sources/title-icon.png" ]; then
     cp "$PROJECT_DIR/Sources/title-icon.png" "$RESOURCES_DIR/title-icon.png"
@@ -49,19 +49,19 @@ cat > "$CONTENTS/Info.plist" << 'EOF'
     <key>CFBundleDevelopmentRegion</key>
     <string>zh_CN</string>
     <key>CFBundleDisplayName</key>
-    <string>小雷壁纸</string>
+    <string>LiveDesktop</string>
     <key>CFBundleExecutable</key>
-    <string>XiaoLeiWallpaper</string>
+    <string>LiveDesktop</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundleIconName</key>
     <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
-    <string>com.xiaolei.wallpaper</string>
+    <string>com.livedesktop.app</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>XiaoLeiWallpaper</string>
+    <string>LiveDesktop</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>

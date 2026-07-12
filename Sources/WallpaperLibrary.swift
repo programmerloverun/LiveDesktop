@@ -7,7 +7,7 @@ final class WallpaperLibrary: ObservableObject {
 
     private var libraryDir: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return base.appendingPathComponent("XiaoLeiWallpaper/Library")
+        return base.appendingPathComponent("LiveDesktop/Library")
     }
 
     init() {

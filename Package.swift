@@ -2,14 +2,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "XiaoLeiWallpaper",
+    name: "LiveDesktop",
     platforms: [.macOS(.v13)],
     products: [
-        .executable(name: "XiaoLeiWallpaper", targets: ["XiaoLeiWallpaper"])
+        .executable(name: "LiveDesktop", targets: ["LiveDesktop"])
     ],
     targets: [
         .executableTarget(
-            name: "XiaoLeiWallpaper",
+            name: "LiveDesktop",
             path: "Sources"
         )
     ]

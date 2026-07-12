@@ -4,15 +4,15 @@ set -e
 
 APP_PATH="$1"
 DMG_PATH="$2"
-VOL_NAME="小雷壁纸"
+VOL_NAME="LiveDesktop"
 
 if [ -z "$APP_PATH" ] || [ -z "$DMG_PATH" ]; then
     echo "Usage: $0 <app-bundle> <output.dmg>"
     exit 1
 fi
 
-TMP_DMG="/tmp/小雷壁纸_tmp.dmg"
-TMP_MOUNT="/tmp/小雷壁纸_mount"
+TMP_DMG="/tmp/LiveDesktop_tmp.dmg"
+TMP_MOUNT="/tmp/LiveDesktop_mount"
 OUT_DMG="$DMG_PATH"
 
 rm -f "$TMP_DMG" "$OUT_DMG"

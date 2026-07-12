@@ -1,4 +1,4 @@
-# 小雷壁纸 (XiaoLeiWallpaper)
+# LiveDesktop
 
 把 MP4 视频设为 Mac 桌面壁纸，支持多显示器、随机切换。
 
@@ -8,7 +8,7 @@
 
 ### 演示视频
 
-<video src="https://github.com/programmerloverun/XiaoLeiWallpaper/raw/main/docs/demo.mp4" controls width="100%"></video>
+<video src="https://github.com/programmerloverun/LiveDesktop/raw/main/docs/demo.mp4" controls width="100%"></video>
 
 [下载演示视频](docs/demo.mp4)
 
@@ -26,17 +26,16 @@
 
 ## 下载安装
 
-从 [Releases](https://github.com/programmerloverun/XiaoLeiWallpaper/releases) 下载最新 DMG，拖入 `/Applications` 即可。
+从 [Releases](https://github.com/programmerloverun/LiveDesktop/releases) 下载最新 DMG，拖入 `/Applications` 即可。
 
 首次打开时，如果系统提示「无法验证开发者」，请到 **系统设置 → 隐私与安全性** 中点击「仍要打开」。
 
 ## 构建
 
 ```bash
-# 仅构建（未签名）
 make app
 
-# 输出：.build/小雷壁纸.app
+# 输出：.build/LiveDesktop.app
 ```
 
 ## 技术实现

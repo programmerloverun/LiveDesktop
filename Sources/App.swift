@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 @main
-struct XiaoLeiWallpaperApp: App {
+struct LiveDesktopApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
@@ -39,7 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Attach window delegate after SwiftUI creates the window
         DispatchQueue.main.async { [weak self] in
             guard let window = NSApp.windows.first(where: {
-                $0.className.contains("SwiftUI") || $0.title.contains("小雷")
+                $0.className.contains("SwiftUI") || $0.title.contains("LiveDesktop")
             }) ?? NSApp.windows.first
             else { return }
 
