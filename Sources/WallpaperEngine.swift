@@ -156,6 +156,97 @@ final class WallpaperEngine: NSObject, ObservableObject {
                     print("[LiveDesktop] Failed to set desktop image: \(error)")
                 }
             }
+
+            // Sync lock screen wallpaper in the system store
+            self.syncLockScreenToDesktop(imagePath: imageURL.path)
+        }
+    }
+
+    /// Write into macOS wallpaper store so the lock screen shows our image too.
+    /// On macOS 13+, desktop and lock-screen wallpapers are stored independently.
+    private func syncLockScreenToDesktop(imagePath: String) {
+        let storeURL = URL(fileURLWithPath: NSHomeDirectory())
+            .appendingPathComponent("Library/Application Support/com.apple.wallpaper/Store/Index.plist")
+
+        guard let data = try? Data(contentsOf: storeURL),
+              var plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
+        else { return }
+
+        let imageURLEncoded = "file://" + imagePath.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)!
+        let imageConfig: [String: Any] = [
+            "type": "imageFile",
+            "url": ["relative": imageURLEncoded]
+        ]
+        let imageConfigData = try? PropertyListSerialization.data(fromPropertyList: imageConfig, format: .binary, options: 0)
+
+        var didChange = false
+
+        // Update per-display Idle entries
+        if var displays = plist["Displays"] as? [String: [String: Any]] {
+            for (uuid, var modes) in displays {
+                guard let desktop = modes["Desktop"] as? [String: Any],
+                      let content = desktop["Content"] as? [String: Any],
+                      let encodedOptions = content["EncodedOptionValues"] as? Data,
+                      let imageConfigData else { continue }
+
+                let idleContent: [String: Any] = [
+                    "Choices": [[
+                        "Configuration": imageConfigData,
+                        "Files": [],
+                        "Provider": "com.apple.wallpaper.choice.image"
+                    ]],
+                    "EncodedOptionValues": encodedOptions,
+                    "Shuffle": NSNull()
+                ]
+                modes["Idle"] = [
+                    "Content": idleContent,
+                    "LastSet": Date(),
+                    "LastUse": Date()
+                ]
+                displays[uuid] = modes
+                didChange = true
+            }
+            plist["Displays"] = displays
+        }
+
+        // Update global Idle entry
+        if var global = plist["AllSpacesAndDisplays"] as? [String: Any],
+           let desktopGlobal = global["Idle"] as? [String: Any],
+           let content = desktopGlobal["Content"] as? [String: Any],
+           let encodedOptions = content["EncodedOptionValues"] as? Data,
+           let imageConfigData {
+
+            let idleContent: [String: Any] = [
+                "Choices": [[
+                    "Configuration": imageConfigData,
+                    "Files": [],
+                    "Provider": "com.apple.wallpaper.choice.image"
+                ]],
+                "EncodedOptionValues": encodedOptions,
+                "Shuffle": NSNull()
+            ]
+            global["Idle"] = [
+                "Content": idleContent,
+                "LastSet": Date(),
+                "LastUse": Date()
+            ]
+            plist["AllSpacesAndDisplays"] = global
+            didChange = true
+        }
+
+        guard didChange else { return }
+
+        do {
+            let newData = try PropertyListSerialization.data(fromPropertyList: plist, format: .binary, options: 0)
+            try newData.write(to: storeURL, options: .atomic)
+            // Notify the system to reload wallpaper
+            let task = Process()
+            task.launchPath = "/usr/bin/killall"
+            task.arguments = ["-HUP", "WallpaperAgent"]
+            task.launch()
+            print("[LiveDesktop] Lock screen wallpaper synced")
+        } catch {
+            print("[LiveDesktop] Failed to sync lock screen: \(error)")
         }
     }
 
