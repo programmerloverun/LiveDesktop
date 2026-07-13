@@ -26,7 +26,9 @@
 
 ## 下载安装
 
-从 [Releases](https://github.com/programmerloverun/LiveDesktop/releases) 下载最新 DMG，拖入 `/Applications` 即可。
+从 [Releases](https://github.com/programmerloverun/LiveDesktop/releases) 下载最新 DMG（v1.1.0），拖入 `/Applications` 即可。
+
+> 直接下载：[LiveDesktop-1.1.0.dmg](https://github.com/programmerloverun/LiveDesktop/releases/download/v1.1.0/LiveDesktop-1.1.0.dmg)
 
 首次打开时，如果系统提示「无法验证开发者」，请到 **系统设置 → 隐私与安全性** 中点击「仍要打开」。
 
