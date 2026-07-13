@@ -39,6 +39,9 @@ fi
 if [ -f "$PROJECT_DIR/Sources/title-icon.png" ]; then
     cp "$PROJECT_DIR/Sources/title-icon.png" "$RESOURCES_DIR/title-icon.png"
 fi
+if [ -d "$PROJECT_DIR/Resources/BuiltInWallpapers" ]; then
+    cp -R "$PROJECT_DIR/Resources/BuiltInWallpapers" "$RESOURCES_DIR/"
+fi
 
 # Create Info.plist
 cat > "$CONTENTS/Info.plist" << 'EOF'
@@ -65,7 +68,7 @@ cat > "$CONTENTS/Info.plist" << 'EOF'
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>1.1.0</string>
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>LSMinimumSystemVersion</key>

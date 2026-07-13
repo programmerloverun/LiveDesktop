@@ -1,7 +1,7 @@
 APP_NAME       := LiveDesktop
 BUNDLE_NAME    := LiveDesktop.app
 BUNDLE_ID      := com.livedesktop.app
-VERSION        := 1.0.0
+VERSION        := 1.1.0
 BUILD_DIR      := .build
 DMG_NAME       := LiveDesktop-$(VERSION).dmg
 
@@ -25,6 +25,7 @@ app: build
 	cp $(BUILD_DIR)/release/$(APP_NAME) "$(BUILD_DIR)/$(BUNDLE_NAME)/Contents/MacOS/"
 	cp $(APP_NAME).icns "$(BUILD_DIR)/$(BUNDLE_NAME)/Contents/Resources/AppIcon.icns"
 	cp Sources/title-icon.png "$(BUILD_DIR)/$(BUNDLE_NAME)/Contents/Resources/title-icon.png"
+	cp -R Resources/BuiltInWallpapers "$(BUILD_DIR)/$(BUNDLE_NAME)/Contents/Resources/"
 	sed -e 's/__VERSION__/$(VERSION)/g' \
 	    -e 's/__BUNDLE_ID__/$(BUNDLE_ID)/g' \
 	    packaging/Info.plist.template > "$(BUILD_DIR)/$(BUNDLE_NAME)/Contents/Info.plist"

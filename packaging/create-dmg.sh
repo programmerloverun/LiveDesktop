@@ -19,7 +19,7 @@ rm -f "$TMP_DMG" "$OUT_DMG"
 mkdir -p "$TMP_MOUNT"
 
 # Create read-write DMG
-hdiutil create -size 100m -volname "$VOL_NAME" -fs HFS+ -attach "$TMP_DMG"
+hdiutil create -size 200m -volname "$VOL_NAME" -fs HFS+ -attach "$TMP_DMG"
 
 # Copy app
 cp -R "$APP_PATH" "/Volumes/$VOL_NAME/"

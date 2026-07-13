@@ -10,9 +10,30 @@ final class WallpaperLibrary: ObservableObject {
         return base.appendingPathComponent("LiveDesktop/Library")
     }
 
+    private let builtInImportKey = "builtInWallpapersImported_v1"
+
     init() {
         ensureDir()
+        importBuiltInWallpapers()
         loadItems()
+    }
+
+    private func importBuiltInWallpapers() {
+        guard !UserDefaults.standard.bool(forKey: builtInImportKey) else { return }
+        guard let builtInDir = Bundle.main.url(forResource: "BuiltInWallpapers", withExtension: nil) else { return }
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: builtInDir,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else { return }
+
+        for src in files where src.pathExtension.lowercased() == "mp4" {
+            let dest = libraryDir.appendingPathComponent(src.lastPathComponent)
+            if !FileManager.default.fileExists(atPath: dest.path) {
+                try? FileManager.default.copyItem(at: src, to: dest)
+            }
+        }
+        UserDefaults.standard.set(true, forKey: builtInImportKey)
     }
 
     private func ensureDir() {
