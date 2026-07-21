@@ -233,9 +233,6 @@ final class WallpaperEngine: NSObject, ObservableObject {
             guard let newData = try? PropertyListSerialization.data(fromPropertyList: plist, format: .binary, options: 0)
             else { return false }
             try? newData.write(to: storeURL, options: .atomic)
-
-            // Kick WallpaperAgent to pick up the new settings
-            let _ = try? Process.run(URL(fileURLWithPath: "/usr/bin/killall"), arguments: ["WallpaperAgent"])
             return true
         }
 
@@ -352,6 +349,11 @@ final class WallpaperEngine: NSObject, ObservableObject {
         let level = desktopLevel()
         for (_, e) in entries {
             e.window.level = level
+            e.window.orderFront(nil)
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            e.layer.frame = e.window.contentView?.bounds ?? e.layer.frame
+            CATransaction.commit()
         }
     }
 
