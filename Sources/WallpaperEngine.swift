@@ -171,53 +171,38 @@ final class WallpaperEngine: NSObject, ObservableObject {
         let storeURL = URL(fileURLWithPath: NSHomeDirectory())
             .appendingPathComponent("Library/Application Support/com.apple.wallpaper/Store/Index.plist")
 
-        let imageURLEncoded = "file://" + imagePath.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)!
-        let imageConfig: [String: Any] = [
-            "type": "imageFile",
-            "url": ["relative": imageURLEncoded]
-        ]
-        guard let imageConfigData = try? PropertyListSerialization.data(fromPropertyList: imageConfig, format: .binary, options: 0)
-        else { return }
-
-        let idleEntry: [String: Any] = [
-            "Content": [
-                "Choices": [[
-                    "Configuration": imageConfigData,
-                    "Files": [],
-                    "Provider": "com.apple.wallpaper.choice.image"
-                ]],
-                "EncodedOptionValues": Data()
-            ],
-            "LastSet": Date(),
-            "LastUse": Date()
-        ]
-
-        /// Remove all per-display Idle entries at every level so macOS falls back
-        /// to the global AllSpacesAndDisplays.Idle entry with the correct image.
+        /// Copy the Desktop entry as the Idle entry for every display at every level.
+        /// This forces "linked" mode where the lock screen shows the same image as the
+        /// desktop — without triggering WallpaperAgent to overwrite it back to "default".
         func writeOnce() -> Bool {
             guard let data = try? Data(contentsOf: storeURL),
                   var plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
             else { return false }
 
-            // Remove Idle from top-level per-display entries
+            // Top-level Displays: copy Desktop → Idle for each display
             if var displays = plist["Displays"] as? [String: [String: Any]] {
                 for uuid in displays.keys {
-                    displays[uuid]?.removeValue(forKey: "Idle")
+                    if let desktop = displays[uuid]?["Desktop"] {
+                        displays[uuid]?["Idle"] = desktop
+                    }
                 }
                 plist["Displays"] = displays
             }
 
-            // Remove Idle from Spaces-level per-display and per-space Default entries
+            // Spaces-level: copy Desktop → Idle for Displays and Default entries
             if var spaces = plist["Spaces"] as? [String: [String: Any]] {
                 for (spaceId, spaceEntry) in spaces {
                     var entry = spaceEntry
-                    if var defaultEntry = entry["Default"] as? [String: Any] {
-                        defaultEntry.removeValue(forKey: "Idle")
+                    if var defaultEntry = entry["Default"] as? [String: Any],
+                       let desktop = defaultEntry["Desktop"] {
+                        defaultEntry["Idle"] = desktop
                         entry["Default"] = defaultEntry
                     }
                     if var spaceDisplays = entry["Displays"] as? [String: [String: Any]] {
                         for uuid in spaceDisplays.keys {
-                            spaceDisplays[uuid]?.removeValue(forKey: "Idle")
+                            if let desktop = spaceDisplays[uuid]?["Desktop"] {
+                                spaceDisplays[uuid]?["Idle"] = desktop
+                            }
                         }
                         entry["Displays"] = spaceDisplays
                     }
@@ -226,9 +211,12 @@ final class WallpaperEngine: NSObject, ObservableObject {
                 plist["Spaces"] = spaces
             }
 
-            // Global fallback lock screen image
-            plist["AllSpacesAndDisplays"] = ["Idle": idleEntry, "Type": "idle"] as [String: Any]
-            plist["SystemDefault"] = ["Idle": idleEntry, "Type": "idle"] as [String: Any]
+            // Global entries: copy Idle from first display's Desktop as template
+            if let firstDisplay = (plist["Displays"] as? [String: [String: Any]])?.values.first,
+               let desktopEntry = firstDisplay["Desktop"] {
+                plist["AllSpacesAndDisplays"] = ["Idle": desktopEntry, "Type": "idle"]
+                plist["SystemDefault"] = ["Idle": desktopEntry, "Type": "idle"]
+            }
 
             guard let newData = try? PropertyListSerialization.data(fromPropertyList: plist, format: .binary, options: 0)
             else { return false }
@@ -236,11 +224,11 @@ final class WallpaperEngine: NSObject, ObservableObject {
             return true
         }
 
-        // Delay to let NSWorkspace.setDesktopImageURL finish populating Displays entries
+        // Delay to let NSWorkspace.setDesktopImageURL finish writing Desktop entries
         DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + 2) {
             guard writeOnce() else { return }
 
-            // Retry after 3s if WallpaperAgent reverted our changes
+            // Retry after 3s if WallpaperAgent reverted
             DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + 3) {
                 guard let v = try? Data(contentsOf: storeURL),
                       let vp = try? PropertyListSerialization.propertyList(from: v, format: nil) as? [String: Any],
@@ -248,9 +236,20 @@ final class WallpaperEngine: NSObject, ObservableObject {
                     print("[LiveDesktop] Lock screen synced — verified ✓")
                     return
                 }
-                let hasIdle = displays.values.contains { $0["Idle"] != nil }
-                if hasIdle {
-                    print("[LiveDesktop] Lock screen has per-display Idle, retrying...")
+                // Check if any display still has Idle with "default" provider
+                var needsRetry = false
+                for (_, entry) in displays {
+                    if let idle = entry["Idle"] as? [String: Any],
+                       let content = idle["Content"] as? [String: Any],
+                       let choices = content["Choices"] as? [[String: Any]],
+                       let provider = choices.first?["Provider"] as? String,
+                       provider == "default" {
+                        needsRetry = true
+                        break
+                    }
+                }
+                if needsRetry {
+                    print("[LiveDesktop] Lock screen Idle reverted to default, retrying...")
                     _ = writeOnce()
                 } else {
                     print("[LiveDesktop] Lock screen synced — verified ✓")
