@@ -179,25 +179,33 @@ final class WallpaperEngine: NSObject, ObservableObject {
         guard let imageConfigData = try? PropertyListSerialization.data(fromPropertyList: imageConfig, format: .binary, options: 0)
         else { return }
 
+        let idleEntry: [String: Any] = [
+            "Content": [
+                "Choices": [[
+                    "Configuration": imageConfigData,
+                    "Files": [],
+                    "Provider": "com.apple.wallpaper.choice.image"
+                ]],
+                "EncodedOptionValues": Data()
+            ],
+            "LastSet": Date(),
+            "LastUse": Date()
+        ]
+
         func writeOnce() -> Bool {
             guard let data = try? Data(contentsOf: storeURL),
                   var plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
             else { return false }
 
-            plist.removeValue(forKey: "Displays")
+            // Preserve per-display entries and add Idle for each display,
+            // so external displays also get the new lock screen image.
+            var displays = plist["Displays"] as? [String: [String: Any]] ?? [:]
+            for uuid in displays.keys {
+                displays[uuid]?["Idle"] = idleEntry
+            }
+            plist["Displays"] = displays
 
-            let idleEntry: [String: Any] = [
-                "Content": [
-                    "Choices": [[
-                        "Configuration": imageConfigData,
-                        "Files": [],
-                        "Provider": "com.apple.wallpaper.choice.image"
-                    ]],
-                    "EncodedOptionValues": Data()
-                ],
-                "LastSet": Date(),
-                "LastUse": Date()
-            ]
+            // Global fallback for any displays not yet in the plist
             plist["AllSpacesAndDisplays"] = ["Idle": idleEntry, "Type": "idle"] as [String: Any]
             plist["SystemDefault"] = ["Idle": idleEntry, "Type": "idle"] as [String: Any]
 
@@ -207,9 +215,8 @@ final class WallpaperEngine: NSObject, ObservableObject {
             return true
         }
 
-        // Delay to let NSWorkspace.setDesktopImageURL finish triggering WallpaperAgent
+        // Delay to let NSWorkspace.setDesktopImageURL finish populating Displays entries
         DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + 2) {
-            // First attempt
             guard writeOnce() else { return }
 
             // Retry after 3s if WallpaperAgent reverted our changes
@@ -220,10 +227,12 @@ final class WallpaperEngine: NSObject, ObservableObject {
                     print("[LiveDesktop] Lock screen synced — verified ✓")
                     return
                 }
-                // Check if any display still has an Idle entry
-                let hasIdle = displays.values.contains { ($0["Idle"] as? [String: Any]) != nil }
-                if hasIdle {
-                    print("[LiveDesktop] Lock screen reverted, retrying...")
+                // Verify every display has an Idle entry
+                let missingIdle = displays.contains { _, entry in
+                    entry["Idle"] == nil
+                }
+                if missingIdle {
+                    print("[LiveDesktop] Lock screen missing per-display Idle, retrying...")
                     _ = writeOnce()
                 } else {
                     print("[LiveDesktop] Lock screen synced — verified ✓")
