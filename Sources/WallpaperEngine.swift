@@ -192,26 +192,50 @@ final class WallpaperEngine: NSObject, ObservableObject {
             "LastUse": Date()
         ]
 
+        /// Remove all per-display Idle entries at every level so macOS falls back
+        /// to the global AllSpacesAndDisplays.Idle entry with the correct image.
         func writeOnce() -> Bool {
             guard let data = try? Data(contentsOf: storeURL),
                   var plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
             else { return false }
 
-            // Preserve per-display entries and add Idle for each display,
-            // so external displays also get the new lock screen image.
-            var displays = plist["Displays"] as? [String: [String: Any]] ?? [:]
-            for uuid in displays.keys {
-                displays[uuid]?["Idle"] = idleEntry
+            // Remove Idle from top-level per-display entries
+            if var displays = plist["Displays"] as? [String: [String: Any]] {
+                for uuid in displays.keys {
+                    displays[uuid]?.removeValue(forKey: "Idle")
+                }
+                plist["Displays"] = displays
             }
-            plist["Displays"] = displays
 
-            // Global fallback for any displays not yet in the plist
+            // Remove Idle from Spaces-level per-display and per-space Default entries
+            if var spaces = plist["Spaces"] as? [String: [String: Any]] {
+                for (spaceId, spaceEntry) in spaces {
+                    var entry = spaceEntry
+                    if var defaultEntry = entry["Default"] as? [String: Any] {
+                        defaultEntry.removeValue(forKey: "Idle")
+                        entry["Default"] = defaultEntry
+                    }
+                    if var spaceDisplays = entry["Displays"] as? [String: [String: Any]] {
+                        for uuid in spaceDisplays.keys {
+                            spaceDisplays[uuid]?.removeValue(forKey: "Idle")
+                        }
+                        entry["Displays"] = spaceDisplays
+                    }
+                    spaces[spaceId] = entry
+                }
+                plist["Spaces"] = spaces
+            }
+
+            // Global fallback lock screen image
             plist["AllSpacesAndDisplays"] = ["Idle": idleEntry, "Type": "idle"] as [String: Any]
             plist["SystemDefault"] = ["Idle": idleEntry, "Type": "idle"] as [String: Any]
 
             guard let newData = try? PropertyListSerialization.data(fromPropertyList: plist, format: .binary, options: 0)
             else { return false }
             try? newData.write(to: storeURL, options: .atomic)
+
+            // Kick WallpaperAgent to pick up the new settings
+            let _ = try? Process.run(URL(fileURLWithPath: "/usr/bin/killall"), arguments: ["WallpaperAgent"])
             return true
         }
 
@@ -227,12 +251,9 @@ final class WallpaperEngine: NSObject, ObservableObject {
                     print("[LiveDesktop] Lock screen synced — verified ✓")
                     return
                 }
-                // Verify every display has an Idle entry
-                let missingIdle = displays.contains { _, entry in
-                    entry["Idle"] == nil
-                }
-                if missingIdle {
-                    print("[LiveDesktop] Lock screen missing per-display Idle, retrying...")
+                let hasIdle = displays.values.contains { $0["Idle"] != nil }
+                if hasIdle {
+                    print("[LiveDesktop] Lock screen has per-display Idle, retrying...")
                     _ = writeOnce()
                 } else {
                     print("[LiveDesktop] Lock screen synced — verified ✓")
